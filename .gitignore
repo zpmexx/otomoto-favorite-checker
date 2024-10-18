@@ -167,3 +167,6 @@ images/
 *.bat
 chromedriver
 *json
+*bat
+vir
+!req.txt
