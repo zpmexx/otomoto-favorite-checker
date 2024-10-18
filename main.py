@@ -4,6 +4,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 import time
 from selenium.webdriver.chrome.service import Service
+from selenium.common.exceptions import NoSuchElementException
 from get_chrome_driver import GetChromeDriver
 import json
 import re
@@ -80,8 +81,7 @@ except Exception as e:
     with open ('logfile.log', 'a') as file:
         file.write(f"""{formatDateTime} Problem with reading old_cars.json - {str(e)}\n""")
 
-#urls
-observed_link = 'https://www.otomoto.pl/obserwowane'
+#login url
 login_url = 'https://login.otomoto.pl/?cc=1&client_id=1l7s2rtc114dc9uqu87n8fm27&code_challenge=-Ejq_llaGsflALBHcGDZCPIEm2j89uoiHFvQI3twiA8&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.otomoto.pl%2Fapi%2Fauth%2Fcallback%2Fhciam&st=eyJzbCI6IjE4OWE2ZTBkYTgxeDFjY2Q1NDVjIiwicyI6IjE5MjlmMDM5ZTA4eDI2ZjY5OWE3In0%3D'
 
 
@@ -116,42 +116,51 @@ except Exception as e:
         file.write(f"""{formatDateTime} Problem with login - {str(e)}\n""")
 
 #go to favorites
-list_items = []
-try:
-    driver.get(observed_link)
-    
-    time.sleep(5)
-    
-    favorites_objects = driver.find_element(By.XPATH, '/html/body/div[1]/div/div/div/main/main/ul')
-    list_items = favorites_objects.find_elements(By.TAG_NAME, 'a')
-except Exception as e:
-    with open ('logfile.log', 'a') as file:
-        file.write(f"""{formatDateTime} Problem with favorites page - {str(e)}\n""")
-
-#get current data from favorite's website
+counter = 1
 cars_dict = {}
-for car in list_items:
+list_items = []
+while True:
     try:
-        link = car.get_attribute('href')
-        title = car.get_attribute('title')
-        city = car.find_element(By.CSS_SELECTOR, 'p.e8o52ta6.ooa-1po1g1j').text
+        observed_link = f'https://www.otomoto.pl/obserwowane?page={counter}'
+        driver.get(observed_link)
         
-        price = car.find_element(By.CSS_SELECTOR, 'p[data-testid="ad-price"]').text
-        price = price.replace(',','.')     
-        clean_price = re.sub(r'[^\d.]', '', price)
+        time.sleep(5)
         
-        item_data = {
-            "title": title,
-            "city": city,
-            "price": clean_price
-        }
+        favorites_objects = driver.find_element(By.XPATH, '/html/body/div[1]/div/div/div/main/main/ul')
+        list_items = favorites_objects.find_elements(By.TAG_NAME, 'a')
+        counter += 1
+    except NoSuchElementException:
+            #print(f"No more pages after {counter}.")
+            break
 
-        cars_dict[link] = item_data
-        
     except Exception as e:
         with open ('logfile.log', 'a') as file:
-            file.write(f"""{formatDateTime} Problem with single auction details - {str(e)}\n""")
+            file.write(f"""{formatDateTime} Problem with favorites page - {str(e)}\n""")
+
+#get current data from favorite's website
+    
+    for car in list_items:
+        try:
+            link = car.get_attribute('href')
+            title = car.get_attribute('title')
+            city = car.find_element(By.CSS_SELECTOR, 'p.e8o52ta6.ooa-1po1g1j').text
             
+            price = car.find_element(By.CSS_SELECTOR, 'p[data-testid="ad-price"]').text
+            price = price.replace(',','.')     
+            clean_price = re.sub(r'[^\d.]', '', price)
+            
+            item_data = {
+                "title": title,
+                "city": city,
+                "price": clean_price
+            }
+
+            cars_dict[link] = item_data
+            
+        except Exception as e:
+            with open ('logfile.log', 'a') as file:
+                file.write(f"""{formatDateTime} Problem with single auction details - {str(e)}\n""")
+                
 #close selenium's connection
 driver.close()  
 driver.quit()
