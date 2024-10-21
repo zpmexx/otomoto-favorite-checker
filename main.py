@@ -92,7 +92,7 @@ except Exception as e:
     with open ('logfile.log', 'a') as file:
         file.write(f"""{formatDateTime} Problem with  loading a login page - {str(e)}\n""")
 
-time.sleep(1)
+time.sleep(5)
 
 #clear accept cookies to log in
 try:
@@ -110,7 +110,7 @@ try:
 
     driver.find_element(By.XPATH,'/html/body/div[1]/div/div/div/div/div[1]/div[2]/div[2]/div[2]/form/button[2]').click()
 
-    time.sleep(5)
+    time.sleep(10)
 except Exception as e:
     with open ('logfile.log', 'a') as file:
         file.write(f"""{formatDateTime} Problem with login - {str(e)}\n""")
@@ -124,7 +124,7 @@ while True:
         observed_link = f'https://www.otomoto.pl/obserwowane?page={counter}'
         driver.get(observed_link)
         
-        time.sleep(5)
+        time.sleep(10)
         
         favorites_objects = driver.find_element(By.XPATH, '/html/body/div[1]/div/div/div/main/main/ul')
         list_items = favorites_objects.find_elements(By.TAG_NAME, 'a')
@@ -168,11 +168,20 @@ driver.quit()
 #sort cars by price
 cars_dict = dict(sorted(cars_dict.items(), key=lambda item: float(item[1]['price'])))
 body = ''
+try:
+    with open('cars.log', 'a') as file:
+        file.write(f"{formatDateTime} Cars: {json.dumps(cars_dict, indent=4)}\n")
+except Exception as e:
+    with open('logfile.log', 'a') as file:
+        file.write(f"Problem with exporting to cars.log: {e}\n")
 
+#finished auctions
+deleted_cars = {}
 try:
 #delete no longer observed auctions from old data
     for link in list(old_cars_dict.keys()):
         if link not in cars_dict:
+            deleted_cars[link] = old_cars_dict[link]
             del old_cars_dict[link]
 
     #compare old and new data, prepare email's body
@@ -194,6 +203,7 @@ except Exception as e:
 if not cars_dict:
     body = "No auctions observed (check log file)."
 else:
+    body += f"<h2>Number of followed auctions: {len(cars_dict)}</h2>"
     body += """
     <table border="1" cellpadding="10" cellspacing="0" style="width: 100%; border-collapse: collapse;">
         <thead>
@@ -207,20 +217,49 @@ else:
     """
 
 # Dynamically generating table rows
-for link, data in cars_dict.items():
-    body += f"""
-        <tr>
-            <td style="text-align: center;"><a href="{link}">{data['title']}</a></td>
-            <td style="text-align: center;">{data['city']}</td>
-            <td style="text-align: center;">{data['price']}</td>
-        </tr>
+    for link, data in cars_dict.items():
+        body += f"""
+            <tr>
+                <td style="text-align: center;"><a href="{link}">{data['title']}</a></td>
+                <td style="text-align: center;">{data['city']}</td>
+                <td style="text-align: center;">{data['price']}</td>
+            </tr>
+        """
+        
+    # End of the table
+    body += """
+        </tbody>
+    </table>
     """
 
-# End of the table
-body += """
-    </tbody>
-</table>
-"""
+# New table for deleted auctions
+if deleted_cars:
+    body += "<h4>Auctions that have been deleted:</h4>"
+    body += """
+    <table border="1" cellpadding="10" cellspacing="0" style="width: 100%; border-collapse: collapse; background-color: red;">
+        <thead>
+            <tr style="background-color: #ff9999;">
+                <th style="text-align: center; color: white;">Name</th>
+                <th style="text-align: center; color: white;">City</th>
+                <th style="text-align: center; color: white;">Price</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+
+    # Dynamically generating table rows
+    for link, data in deleted_cars.items():
+        body += f"""
+            <tr style="background-color: #ffcccc;">
+                <td style="text-align: center;"><a href="{link}" style="color: black;">{data['title']}</a></td>
+                <td style="text-align: center; color: black;">{data['city']}</td>
+                <td style="text-align: center; color: black;">{data['price']}</td>
+            </tr>
+        """
+    # End of the table
+    body += """
+        </tbody>
+    </table>"""
 if not old_cars_dict:
     old_cars_dict = cars_dict
 try:
