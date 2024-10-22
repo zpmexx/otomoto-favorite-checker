@@ -152,7 +152,8 @@ while True:
             item_data = {
                 "title": title,
                 "city": city,
-                "price": clean_price
+                "price": clean_price,
+                "followed_since": formatted_date
             }
 
             cars_dict[link] = item_data
@@ -165,8 +166,7 @@ while True:
 driver.close()  
 driver.quit()
 
-#sort cars by price
-cars_dict = dict(sorted(cars_dict.items(), key=lambda item: float(item[1]['price'])))
+
 body = ''
 try:
     with open('cars.log', 'a') as file:
@@ -200,15 +200,26 @@ try:
 except Exception as e:
     with open ('logfile.log', 'a') as file:
         file.write(f"""{formatDateTime} Problem with comparing new and old data - {str(e)}\n""")
+
+#sort cars by price, date
+cars_dict = dict(sorted(cars_dict.items(), key=lambda item: (float(item[1]['price']), datetime.strptime(item[1]['followed_since'], '%Y-%m-%d'))))
+old_cars_dict = dict(sorted(old_cars_dict.items(), key=lambda item: (float(item[1]['price']), datetime.strptime(item[1]['followed_since'], '%Y-%m-%d'))))
+
+#sort by follow date, price
+# cars_dict = dict(sorted(cars_dict.items(), key=lambda item: (datetime.strptime(item[1]['followed_since'], '%Y-%m-%d'), float(item[1]['price']))))
+# old_cars_dict = dict(sorted(old_cars_dict.items(), key=lambda item: (datetime.strptime(item[1]['followed_since'], '%Y-%m-%d'), float(item[1]['price']))))  
+
+
 if not cars_dict:
     body = "No auctions observed (check log file)."
 else:
-    body += f"<h2>Number of followed auctions: {len(cars_dict)}</h2>"
+    body += f"<h2>Number of followed auctions: {len(old_cars_dict)}</h2>"
     body += """
     <table border="1" cellpadding="10" cellspacing="0" style="width: 100%; border-collapse: collapse;">
         <thead>
             <tr>
                 <th style="text-align: center;">Name</th>
+                <th style="text-align: center;">Followed since</th>
                 <th style="text-align: center;">City</th>
                 <th style="text-align: center;">Price</th>
             </tr>
@@ -217,10 +228,11 @@ else:
     """
 
 # Dynamically generating table rows
-    for link, data in cars_dict.items():
+    for link, data in old_cars_dict.items():
         body += f"""
             <tr>
                 <td style="text-align: center;"><a href="{link}">{data['title']}</a></td>
+                <td style="text-align: center;">{data['followed_since']}</td>
                 <td style="text-align: center;">{data['city']}</td>
                 <td style="text-align: center;">{data['price']}</td>
             </tr>
@@ -240,6 +252,7 @@ if deleted_cars:
         <thead>
             <tr style="background-color: #ff9999;">
                 <th style="text-align: center; color: white;">Name</th>
+                <th style="text-align: center; color: white;">Followed since</th>
                 <th style="text-align: center; color: white;">City</th>
                 <th style="text-align: center; color: white;">Price</th>
             </tr>
@@ -252,6 +265,7 @@ if deleted_cars:
         body += f"""
             <tr style="background-color: #ffcccc;">
                 <td style="text-align: center;"><a href="{link}" style="color: black;">{data['title']}</a></td>
+                <td style="text-align: center; color: black;">{data['followed_since']}</td>
                 <td style="text-align: center; color: black;">{data['city']}</td>
                 <td style="text-align: center; color: black;">{data['price']}</td>
             </tr>
