@@ -23,4 +23,4 @@
 	- **run `python main.py` file**
 	- **every single exception will be stored into .log file**
 
-<span style="color: red; font-size: 1.5em;">Scripts are working with chrome driver and outlook email account, if you would like to use other browser or email provider you will need to slightly modify the code</span>
+### !!! Scripts are working with chrome driver and outlook email account, if you would like to use other browser or email provider you will need to slightly modify the code
