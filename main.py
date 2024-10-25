@@ -182,6 +182,8 @@ try:
     for link in list(old_cars_dict.keys()):
         if link not in cars_dict:
             deleted_cars[link] = old_cars_dict[link]
+            deleted_cars[link]['ended_date'] = formatted_date
+            deleted_cars[link]['duration'] = (datetime.strptime(formatted_date, "%Y-%m-%d") - datetime.strptime(deleted_cars[link]['followed_since'], "%Y-%m-%d")).days
             del old_cars_dict[link]
 
     #compare old and new data, prepare email's body
@@ -201,6 +203,7 @@ except Exception as e:
     with open ('logfile.log', 'a') as file:
         file.write(f"""{formatDateTime} Problem with comparing new and old data - {str(e)}\n""")
 
+print(deleted_cars)
 #sort cars by price, date
 cars_dict = dict(sorted(cars_dict.items(), key=lambda item: (float(item[1]['price']), datetime.strptime(item[1]['followed_since'], '%Y-%m-%d'))))
 old_cars_dict = dict(sorted(old_cars_dict.items(), key=lambda item: (float(item[1]['price']), datetime.strptime(item[1]['followed_since'], '%Y-%m-%d'))))
@@ -283,6 +286,9 @@ try:
 
     with open('new_cars.json', 'w') as json_file:
         json.dump(cars_dict, json_file, indent=4)
+        
+    with open('deleted_cars.json', 'a') as json_file:
+        json.dump(deleted_cars, json_file, indent=4)
 except Exception as e:
     with open ('logfile.log', 'a') as file:
         file.write(f"""{formatDateTime} Problem with dumping data to json - {str(e)}\n""")
