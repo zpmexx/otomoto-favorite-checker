@@ -16,6 +16,32 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from datetime import datetime
+import sqlite3
+
+
+
+#create database
+conn = sqlite3.connect('cars.db')
+cursor = conn.cursor()
+
+# SQL command to create the table
+create_table_query = """
+CREATE TABLE IF NOT EXISTS cars (
+    link TEXT PRIMARY KEY,
+    title TEXT,
+    city TEXT,
+    price REAL,
+    followed_since DATE,
+    ended_date DATE,
+    duration INTEGER
+);
+"""
+
+# Execute the command
+cursor.execute(create_table_query)
+
+# Commit the changes and close the connection
+
 
 #get date
 now = formatDateTime = formatted_date = formatDbDateTime = None
@@ -184,14 +210,23 @@ try:
             deleted_cars[link] = old_cars_dict[link]
             deleted_cars[link]['ended_date'] = formatted_date
             deleted_cars[link]['duration'] = (datetime.strptime(formatted_date, "%Y-%m-%d") - datetime.strptime(deleted_cars[link]['followed_since'], "%Y-%m-%d")).days
+            
+            #update db
+            cursor.execute("""
+                    UPDATE cars SET ended_date = ?, duration = ? WHERE link = ?""", (formatted_date, deleted_cars[link]['duration'],link))
+            conn.commit()
             del old_cars_dict[link]
-
+           
     #compare old and new data, prepare email's body
 
     for link, data in cars_dict.items():
-        #add new links to old file
+        #add new links to old file + new to db
         if link not in old_cars_dict:
             old_cars_dict[link] = data
+            cursor.execute("""
+                INSERT INTO cars (link, title, city, price, followed_since)
+                VALUES (?, ?, ?, ?, ?)
+                """, (link, data['title'], data['city'], data['price'], data['followed_since']))
         else:
             old_price = float(old_cars_dict[link]['price'])
             new_price = float(data['price'])
@@ -199,6 +234,9 @@ try:
             if float(old_price) > float(new_price):
                 body += f"""<h3><a href="{link}">{data['title']}</a> price change from {old_price} to {new_price} <p style="color: red;">difference: {old_price - new_price}</p></h3>"""
                 old_cars_dict[link]['price'] = data['price']
+                cursor.execute("""
+                    UPDATE cars SET price = ? WHERE link = ?""", (price, link))
+        conn.commit()
 except Exception as e:
     with open ('logfile.log', 'a') as file:
         file.write(f"""{formatDateTime} Problem with comparing new and old data - {str(e)}\n""")
@@ -212,6 +250,8 @@ old_cars_dict = dict(sorted(old_cars_dict.items(), key=lambda item: (float(item[
 # cars_dict = dict(sorted(cars_dict.items(), key=lambda item: (datetime.strptime(item[1]['followed_since'], '%Y-%m-%d'), float(item[1]['price']))))
 # old_cars_dict = dict(sorted(old_cars_dict.items(), key=lambda item: (datetime.strptime(item[1]['followed_since'], '%Y-%m-%d'), float(item[1]['price']))))  
 
+#close db
+conn.close()
 
 if not cars_dict:
     body = "No auctions observed (check log file)."
@@ -281,14 +321,15 @@ if not old_cars_dict:
     old_cars_dict = cars_dict
 try:
     #dump data
-    with open('old_cars.json', 'w') as json_file:
-        json.dump(old_cars_dict, json_file, indent=4)
-
-    with open('new_cars.json', 'w') as json_file:
-        json.dump(cars_dict, json_file, indent=4)
-        
-    with open('deleted_cars.json', 'a') as json_file:
-        json.dump(deleted_cars, json_file, indent=4)
+    if old_cars_dict:
+        with open('old_cars.json', 'w') as json_file:
+            json.dump(old_cars_dict, json_file, indent=4)
+    if cars_dict:
+        with open('new_cars.json', 'w') as json_file:
+            json.dump(cars_dict, json_file, indent=4)
+    if deleted_cars:
+        with open('deleted_cars.json', 'a') as json_file:
+            json.dump(deleted_cars, json_file, indent=4)
 except Exception as e:
     with open ('logfile.log', 'a') as file:
         file.write(f"""{formatDateTime} Problem with dumping data to json - {str(e)}\n""")

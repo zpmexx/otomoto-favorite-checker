@@ -170,3 +170,5 @@ chromedriver
 *bat
 vir
 !req.txt
+*.db
+test.py
