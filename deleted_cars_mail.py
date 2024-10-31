@@ -16,6 +16,11 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from datetime import datetime
+import sqlite3
+
+
+
+
 
 #get date
 now = formatDateTime = formatted_date = formatDbDateTime = None
@@ -40,17 +45,28 @@ except Exception as e:
     with open ('logfile.log', 'a') as file:
         file.write(f"""{formatDateTime} Problem with loading .env variables - {str(e)}\n""")
 
-      
-try:
-    with open('deleted_cars.json', 'r') as json_file:
-        deleted_cars_dict = json.load(json_file)
-except Exception as e:
-    deleted_cars_dict = {}
-    with open ('logfile.log', 'a') as file:
-        file.write(f"""{formatDateTime} Problem with reading deleted_cars.json - {str(e)}\n""")
+#connect to db
+conn = sqlite3.connect('cars.db')
+conn.row_factory = sqlite3.Row
+cursor = conn.cursor()
 
-#sort by duration desc
-deleted_cars_dict = dict(sorted(deleted_cars_dict.items(), key=lambda item: item[1]['duration'], reverse=True))
+sql_query = """SELECT * from cars where ended_date IS NOT NULL order by duration desc"""
+
+auctions_ended = cursor.execute(sql_query)
+
+deleted_cars_dict = {
+    row['link']: {
+        'title': row['title'],
+        'city': row['city'],
+        'followed_since': row['followed_since'],
+        'ended_date': row['ended_date'],
+        'duration': row['duration'],
+        'price': row['price']
+    }
+    for row in auctions_ended.fetchall()
+}
+
+print(deleted_cars_dict)
 
 body = ''
 if not deleted_cars_dict:
@@ -72,24 +88,25 @@ else:
         <tbody>
     """
 
+print(body)
 # Dynamically generating table rows
-    for link, data in deleted_cars_dict.items():
-        body += f"""
-            <tr>
-                <td style="text-align: center;">{data['title']}</td>
-                <td style="text-align: center;">{data['city']}</td>
-                <td style="text-align: center;">{data['followed_since']}</td>
-                <td style="text-align: center;">{data['ended_date']}</td>
-                <td style="text-align: center;">{data['duration']}</td>
-                <td style="text-align: center;">{data['price']}</td>
-            </tr>
-        """
-        
-    # End of the table
-    body += """
-        </tbody>
-    </table>
+for link, data in deleted_cars_dict.items():
+    body += f"""
+        <tr>
+            <td style="text-align: center;">{data['title']}</td>
+            <td style="text-align: center;">{data['city']}</td>
+            <td style="text-align: center;">{data['followed_since']}</td>
+            <td style="text-align: center;">{data['ended_date']}</td>
+            <td style="text-align: center;">{data['duration']}</td>
+            <td style="text-align: center;">{data['price']}</td>
+        </tr>
     """
+    
+# End of the table
+body += """
+    </tbody>
+</table>
+"""
 
 try:
     #send and email
