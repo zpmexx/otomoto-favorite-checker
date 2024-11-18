@@ -66,7 +66,6 @@ deleted_cars_dict = {
     for row in auctions_ended.fetchall()
 }
 
-print(deleted_cars_dict)
 
 body = ''
 if not deleted_cars_dict:
