@@ -236,14 +236,15 @@ try:
     # Set correct type of links from db
     db_links = set(link[0] for link in db_links_get)
     # Find links in cars_dict that are not in db_links
-    missing_in_db = [cars_dict[link] for link in cars_dict if link not in db_links]
+    missing_in_db = {link: cars_dict[link] for link in cars_dict if link not in db_links}
 except Exception as e:
     with open('logfile.log', 'a') as file:
         file.write(f"{formatDateTime}  {file_name} Problem with comparing links from favorites and db: {e}\n")
 
+print(missing_in_db)
 #
 try:
-    for link, data in cars_dict.items():
+    for link,data in missing_in_db.items():
         #add new links to old file + new to db
         if link not in old_cars_dict:
             old_cars_dict[link] = data
@@ -251,7 +252,7 @@ try:
                 INSERT INTO cars (link, title, city, price, followed_since)
                 VALUES (?, ?, ?, ?, ?)
                 """, (link, data['title'], data['city'], data['price'], data['followed_since']))
-    conn.commit()
+        conn.commit()
 except Exception as e:
     with open('logfile.log', 'a') as file:
         file.write(f"{formatDateTime}  {file_name} Problem with comparing inserting data to db: {e}\n")

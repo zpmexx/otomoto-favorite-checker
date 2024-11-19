@@ -74,16 +74,32 @@ except:
     
 
 try:
-    db_links = cursor.execute("SELECT link from cars where ended_date IS NULL").fetchall()
+    db_links = cursor.execute("SELECT link from cars where ended_date IS NOT NULL").fetchall()
 except Exception as e:
     with open ('logfile.log', 'a') as file:
         file.write(f"""{formatDateTime} Problem with  loading a login page - {str(e)}\n""")
         sys.exit(0)
 #selenium starts here
 
+key_mapping = {
+    'Przebieg': 'przebieg',
+    'Rodzaj paliwa': 'rodzaj_paliwa',
+    'Skrzynia biegów': 'skrzynia_biegow',
+    'Typ nadwozia': 'typ_nadwozia',
+    'Pojemność skokowa': 'pojemnosc_skokowa',
+    'Moc': 'moc',
+    'Rok produkcji': 'rok_produkcji',
+    'Model pojazdu': 'model_pojazdu',
+    'Wersja': 'wersja',
+    'Generacja': 'generacja',
+    'Liczba drzwi': 'liczba_drzwi',
+    'Liczba miejsc': 'liczba_miejsc',
+    'Kolor': 'kolor'
+}
+
 for link in db_links:
     try:
-        driver.get(link)
+        driver.get(link[0])
     except Exception as e:
         with open ('logfile.log', 'a') as file:
             file.write(f"""{formatDateTime} {file_name} Problem with loading page - {str(e)}\n""")
@@ -94,7 +110,8 @@ for link in db_links:
     most_important_keys = driver.find_elements(By.CLASS_NAME, "e1ho6mkz3.ooa-rlgnr.er34gjf0")
         
     most_important_values = driver.find_elements(By.CLASS_NAME, "e1ho6mkz2.ooa-1rcllto.er34gjf0")
-
+    
+    
     for key, value in zip(most_important_keys,most_important_values):
         data_dict[key.text] = value.text
 
@@ -111,10 +128,25 @@ for link in db_links:
         except Exception as e:
             # Handle missing data gracefully
             print(f"Error extracting section: {e}")
-            
 
-    # Print the resulting dictionary
-    print("Extracted Data Dictionary:", data_dict)
+    try:
+        set_clause = ", ".join(f"{key_mapping[key]} = ?" for key in data_dict if key in key_mapping)
+        values = list(data_dict.values())
+        values.append(link[0])  # Append the link value for the WHERE clause
+        
+        sql_query = f"UPDATE cars SET {set_clause} WHERE link = ?"
+
+        # Execute the query
+        cursor.execute(sql_query, values)
+        conn.commit()
+    except:
+        #auction is no longer avaliable
+        followed_since = cursor.execute("select followed_since from cars where link = ?", (link[0],)).fetchone()[0]
+        duration = (datetime.strptime(formatted_date, "%Y-%m-%d") - datetime.strptime(followed_since, "%Y-%m-%d")).days
+        cursor.execute("UPDATE cars SET ended_date = ?, duration = ? WHERE link = ?",(formatted_date, duration, link[0]))
+        conn.commit()
+        
+
 
 driver.close()  
 driver.quit()
