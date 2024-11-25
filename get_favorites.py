@@ -120,16 +120,6 @@ login_data = {
     'password': {password} 
 }
 
-
-#previos car's state
-try:
-    with open('old_cars.json', 'r') as json_file:
-        old_cars_dict = json.load(json_file)
-except Exception as e:
-    old_cars_dict = {}
-    with open ('logfile.log', 'a') as file:
-        file.write(f"""{formatDateTime} Problem with reading old_cars.json - {str(e)}\n""")
-
 #login url
 login_url = 'https://login.otomoto.pl/?cc=1&client_id=1l7s2rtc114dc9uqu87n8fm27&code_challenge=-Ejq_llaGsflALBHcGDZCPIEm2j89uoiHFvQI3twiA8&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.otomoto.pl%2Fapi%2Fauth%2Fcallback%2Fhciam&st=eyJzbCI6IjE4OWE2ZTBkYTgxeDFjY2Q1NDVjIiwicyI6IjE5MjlmMDM5ZTA4eDI2ZjY5OWE3In0%3D'
 
@@ -241,20 +231,16 @@ except Exception as e:
     with open('logfile.log', 'a') as file:
         file.write(f"{formatDateTime}  {file_name} Problem with comparing links from favorites and db: {e}\n")
 
-print(missing_in_db)
-#
 try:
     for link,data in missing_in_db.items():
         #add new links to old file + new to db
-        if link not in old_cars_dict:
-            old_cars_dict[link] = data
-            cursor.execute("""
-                INSERT INTO cars (link, title, city, price, followed_since)
-                VALUES (?, ?, ?, ?, ?)
-                """, (link, data['title'], data['city'], data['price'], data['followed_since']))
+        cursor.execute("""
+            INSERT INTO cars (link, title, city, price, followed_since)
+            VALUES (?, ?, ?, ?, ?)
+            """, (link, data['title'], data['city'], data['price'], data['followed_since']))
         conn.commit()
 except Exception as e:
     with open('logfile.log', 'a') as file:
-        file.write(f"{formatDateTime}  {file_name} Problem with comparing inserting data to db: {e}\n")
+        file.write(f"{formatDateTime}  {file_name} Problem with inserting data to db: {e}\n")
 
 conn.close()

@@ -74,13 +74,14 @@ except:
     
 
 try:
-    db_links = cursor.execute("SELECT link from cars where ended_date IS NOT NULL").fetchall()
+    db_links = cursor.execute("SELECT link from cars").fetchall()
 except Exception as e:
     with open ('logfile.log', 'a') as file:
-        file.write(f"""{formatDateTime} Problem with  loading a login page - {str(e)}\n""")
+        file.write(f"""{formatDateTime} {file_name} Problem with  loading a login page - {str(e)}\n""")
         sys.exit(0)
 #selenium starts here
 
+# Map otomoto data keys with database columns
 key_mapping = {
     'Przebieg': 'przebieg',
     'Rodzaj paliwa': 'rodzaj_paliwa',
@@ -97,58 +98,75 @@ key_mapping = {
     'Kolor': 'kolor'
 }
 
-for link in db_links:
-    try:
-        driver.get(link[0])
-    except Exception as e:
-        with open ('logfile.log', 'a') as file:
-            file.write(f"""{formatDateTime} {file_name} Problem with loading page - {str(e)}\n""")
-            
-    data_dict = {}
-    # Get most imoportant data
-
-    most_important_keys = driver.find_elements(By.CLASS_NAME, "e1ho6mkz3.ooa-rlgnr.er34gjf0")
-        
-    most_important_values = driver.find_elements(By.CLASS_NAME, "e1ho6mkz2.ooa-1rcllto.er34gjf0")
-    
-    
-    for key, value in zip(most_important_keys,most_important_values):
-        data_dict[key.text] = value.text
-
-    # Basic data
-    sections = driver.find_elements(By.XPATH, "//div[contains(@class, 'ooa-arbkbm')]")
-    for section in sections:
+# Iterate over links(auctions) in db
+try:
+    updated_count = deleted_count = 0
+    for link in db_links:
         try:
-            # Extract the label (key)
-            key = section.find_element(By.XPATH, ".//p[1]").text.strip()
-            # Extract the value
-            value = section.find_element(By.XPATH, ".//p[2]").text.strip()
-            # Add to dictionary
-            data_dict[key] = value
+            driver.get(link[0])
         except Exception as e:
-            # Handle missing data gracefully
-            print(f"Error extracting section: {e}")
-
-    try:
-        set_clause = ", ".join(f"{key_mapping[key]} = ?" for key in data_dict if key in key_mapping)
-        values = list(data_dict.values())
-        values.append(link[0])  # Append the link value for the WHERE clause
+            with open ('logfile.log', 'a') as file:
+                file.write(f"""{formatDateTime} {file_name} Problem with loading page - {str(e)}\n""")
+                
+        data_dict = {}
         
-        sql_query = f"UPDATE cars SET {set_clause} WHERE link = ?"
+        # Get most importat data "Najważniejsze"
+        try:
+            details = driver.find_elements(By.XPATH, '//div[@data-testid="detail"]')
+            for detail in details:
+                try:
+                    key = detail.find_element(By.XPATH, './/p[contains(@class, "ooa-rlgnr")]').text
+                    value = detail.find_element(By.XPATH, './/p[contains(@class, "ooa-1rcllto")]').text
+                    data_dict[key] = value
+                except Exception as e:
+                    with open ('logfile.log', 'a') as file:
+                        file.write(f"""{formatDateTime} {file_name} Problem with loading specifc data from most important - {str(e)}\n""")
+        except Exception as e:
+            with open ('logfile.log', 'a') as file:
+                file.write(f"""{formatDateTime} {file_name} Problem with loading most important data - {str(e)}\n""")
 
-        # Execute the query
-        cursor.execute(sql_query, values)
-        conn.commit()
-    except:
-        #auction is no longer avaliable
-        followed_since = cursor.execute("select followed_since from cars where link = ?", (link[0],)).fetchone()[0]
-        duration = (datetime.strptime(formatted_date, "%Y-%m-%d") - datetime.strptime(followed_since, "%Y-%m-%d")).days
-        cursor.execute("UPDATE cars SET ended_date = ?, duration = ? WHERE link = ?",(formatted_date, duration, link[0]))
-        conn.commit()
-        
+        # Get details data "Szczegóły"
+        try:
+            basic_info = driver.find_element(By.XPATH, '//div[@data-testid="basic_information"]')
+            details = basic_info.find_elements(By.XPATH, './/div[contains(@data-testid, "")]')
+            for detail in details:
+                try:
+                    key = detail.find_element(By.CLASS_NAME, "eim4snj7").text
+                    value = detail.find_element(By.CLASS_NAME, "eim4snj8").text
+                    data_dict[key] = value
+                except Exception as e:
+                    with open ('logfile.log', 'a') as file:
+                        file.write(f"""{formatDateTime} {file_name} Problem with loading specifc data from details- {str(e)}\n""")
+        except Exception as e:
+            with open ('logfile.log', 'a') as file:
+                file.write(f"""{formatDateTime} {file_name} Problem with loading details data- {str(e)}\n""")
 
+        try:
+            set_clause = ", ".join(f"{key_mapping[key]} = ?" for key in data_dict if key in key_mapping)
+            set_clause += ", ended_date = NULL, duration = NULL" # Sometimes auctions are not shown (e.g. not payed) and then come back with the same link 
+            values = list(data_dict.values())
+            values.append(link[0])  # Append the link value for the WHERE clause
+            sql_query = f"UPDATE cars SET {set_clause} WHERE link = ?"
+            cursor.execute(sql_query, values)
+            conn.commit()
+            updated_count += 1
+        except:
+            #auction is no longer avaliable
+            followed_since = cursor.execute("select followed_since from cars where link = ?", (link[0],)).fetchone()[0]
+            duration = (datetime.strptime(formatted_date, "%Y-%m-%d") - datetime.strptime(followed_since, "%Y-%m-%d")).days
+            cursor.execute("UPDATE cars SET ended_date = ?, duration = ? WHERE link = ?",(formatted_date, duration, link[0]))
+            conn.commit()
+            deleted_count += 1
+except Exception as e:
+    with open ('logfile.log', 'a') as file:
+        file.write(f"""{formatDateTime} {file_name} Problem with db links - {str(e)}\n""")        
 
 driver.close()  
 driver.quit()
+
+# Send mail section
+
+
+
 
 conn.close()
