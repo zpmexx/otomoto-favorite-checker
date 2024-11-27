@@ -15,6 +15,6 @@
 		- from_address = 'email address of an account that will send an email'
 		- email_password = 'password of email account that will send an email'
 		- to_address = ["firstemail@email.com", "secondemail@email.com"] etc, may be just single email address but list format is required
-	- **run `get_favorites.py` file to insert auctions into db**
+	- **Run or schedule automatic runs of the get_favorites.py file to insert auctions into the database. This script must always be executed before get_extra_data.py to ensure the newest auctions are included in the summary."**
 	- **Run or schedule automatic runs of the `get_extra_data.py` file to collect more specific data and send a summary**
 ### !!! These scripts work with Chrome Driver and an Outlook email account. If you want to use a different browser or email provider, you will need to slightly modify the code.
