@@ -19,6 +19,7 @@ from datetime import datetime
 import sqlite3
 from pathlib import Path
 import sys
+from tables import observed_table, deleted_table
 try:
     file_name = Path(__file__).stem
 except:
@@ -74,10 +75,10 @@ except:
     
 
 try:
-    db_links = cursor.execute("SELECT link from cars").fetchall()
+    db_links = cursor.execute("SELECT link from cars where ended_date IS NULL").fetchall()
 except Exception as e:
     with open ('logfile.log', 'a') as file:
-        file.write(f"""{formatDateTime} {file_name} Problem with  loading a login page - {str(e)}\n""")
+        file.write(f"""{formatDateTime} {file_name} Problem with getting data from db - {str(e)}\n""")
         sys.exit(0)
 #selenium starts here
 
@@ -165,8 +166,109 @@ driver.close()
 driver.quit()
 
 # Send mail section
+try:
+    conn.row_factory = sqlite3.Row  # Enable dictionary-like access for rows
+    cursor = conn.cursor()
+    observed_data = cursor.execute("""SELECT link, title, followed_since, city, price, przebieg, rodzaj_paliwa,
+                                        skrzynia_biegow, typ_nadwozia, pojemnosc_skokowa,moc,rok_produkcji,model_pojazdu
+                                        from cars where ended_date is NULL order by price""").fetchall()
+
+    deleted_data = cursor.execute("""SELECT link, title, city, followed_since, ended_date, duration, price, 
+                                        przebieg, rodzaj_paliwa, skrzynia_biegow, typ_nadwozia, pojemnosc_skokowa,
+                                        moc, rok_produkcji, model_pojazdu from cars where ended_date IS NOT NULL order by duration desc""").fetchall()
+
+except Exception as e:
+    with open ('logfile.log', 'a') as file:
+        file.write(f"""{formatDateTime} {file_name} Problem with db database conection - {str(e)}\n""")
+        
+try:     
+    observed_dict = {
+        row["link"]: {
+            "title": row["title"],
+            "followed_since": row["followed_since"],
+            "city": row["city"],
+            "price": row["price"],
+            "przebieg": row["przebieg"],
+            "rodzaj_paliwa": row["rodzaj_paliwa"],
+            "skrzynia_biegow": row["skrzynia_biegow"],
+            "typ_nadwozia": row["typ_nadwozia"],
+            "pojemnosc_skokowa": row["pojemnosc_skokowa"],
+            "moc": row["moc"],
+            "rok_produkcji": row["rok_produkcji"],
+            "model_pojazdu": row["model_pojazdu"],
+        }
+        for row in observed_data
+    }
+
+    deleted_dict = {
+        row["link"]: {
+            "title": row["title"],
+            "city": row["city"],
+            "followed_since": row["followed_since"],
+            "ended_date": row["ended_date"],
+            "duration": row["duration"],
+            "price": row["price"],
+            "przebieg": row["przebieg"],
+            "rodzaj_paliwa": row["rodzaj_paliwa"],
+            "skrzynia_biegow": row["skrzynia_biegow"],
+            "typ_nadwozia": row["typ_nadwozia"],
+            "pojemnosc_skokowa": row["pojemnosc_skokowa"],
+            "moc": row["moc"],
+            "rok_produkcji": row["rok_produkcji"],
+            "model_pojazdu": row["model_pojazdu"],
+        }
+        for row in deleted_data
+    }
+
+except Exception as e:
+    with open ('logfile.log', 'a') as file:
+        file.write(f"""{formatDateTime} {file_name} Problem with converting db data to dict - {str(e)}\n""")
+
+try:
+    observed_body = observed_table(observed_dict)
+    deleted_body = deleted_table(deleted_dict)
+except Exception as e:
+    with open ('logfile.log', 'a') as file:
+        file.write(f"""{formatDateTime} {file_name} Problem with creating tables - {str(e)}\n""")
 
 
+body = f"""
+<h1>Observed auctions: {len(observed_dict)}, deleted auctions: {len(deleted_dict)}, updated data: {updated_count}, deleted data: {deleted_count}</h1>
+"""
+if observed_body:
+    body += "<h2>Observed auctions</h2>"
+    body += observed_body 
+if deleted_body:
+    body += "<h2>Deleted auctions</h2>"
+    body += deleted_body   
+try:
+    #send and email
+    to_address_loaded = json.loads(to_address)
 
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = from_address
+        msg["To"] = ", ".join(to_address_loaded)
+        msg['Subject'] = f"{formatDateTime} Otomoto status"
+        
+    except Exception as e:
+        with open ('logfile.log', 'a') as file:
+            file.write(f""" Problem z wysłaniem email - {str(e)}\n""")
+
+    msg.attach(MIMEText(body, 'html'))
+
+    try:
+        server = smtplib.SMTP('smtp-mail.outlook.com', 587)
+        server.starttls()
+        server.login(from_address, email_password)
+        text = msg.as_string()
+        server.sendmail(from_address, to_address_loaded, text)
+        server.quit()    
+    except Exception as e:
+        with open ('logfile.log', 'a') as file:
+            file.write(f"""{formatDateTime} Problem z wysłaniem maila - {str(e)}\n""")
+except Exception as e:
+    with open ('logfile.log', 'a') as file:
+        file.write(f"""{formatDateTime} Problem with sending an email - {str(e)}\n""")
 
 conn.close()
