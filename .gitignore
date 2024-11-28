@@ -172,3 +172,4 @@ vir
 !req.txt
 *.db
 test.py
+debug*

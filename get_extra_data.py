@@ -145,7 +145,7 @@ try:
         try:
             set_clause = ", ".join(f"{key_mapping[key]} = ?" for key in data_dict if key in key_mapping)
             set_clause += ", ended_date = NULL, duration = NULL" # Sometimes auctions are not shown (e.g. not payed) and then come back with the same link 
-            values = list(data_dict.values())
+            values = [data_dict[key] for key in data_dict if key in key_mapping]
             values.append(link[0])  # Append the link value for the WHERE clause
             sql_query = f"UPDATE cars SET {set_clause} WHERE link = ?"
             cursor.execute(sql_query, values)
@@ -153,9 +153,11 @@ try:
             updated_count += 1
         except:
             #auction is no longer avaliable
-            followed_since = cursor.execute("select followed_since from cars where link = ?", (link[0],)).fetchone()[0]
+            result = cursor.execute("SELECT followed_since, ended_date, duration FROM cars WHERE link = ?",(link[0],)).fetchone()
+            followed_since, ended_date, duration = result
             duration = (datetime.strptime(formatted_date, "%Y-%m-%d") - datetime.strptime(followed_since, "%Y-%m-%d")).days
-            cursor.execute("UPDATE cars SET ended_date = ?, duration = ? WHERE link = ?",(formatted_date, duration, link[0]))
+            cursor.execute("UPDATE cars SET old_ended_date = ended_date, old_duration = duration, ended_date = ?, duration = ? WHERE link = ?", (formatted_date, duration, link[0]))
+
             conn.commit()
             deleted_count += 1
 except Exception as e:
