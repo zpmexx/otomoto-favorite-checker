@@ -173,3 +173,4 @@ vir
 *.db
 test.py
 debug*
+!backup
