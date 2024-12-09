@@ -19,7 +19,7 @@ from datetime import datetime
 import sqlite3
 from pathlib import Path
 import sys
-from tables import observed_table, deleted_table
+from tables import observed_table, deleted_table, promo_table
 try:
     file_name = Path(__file__).stem
 except:
@@ -100,6 +100,7 @@ key_mapping = {
 }
 
 # Iterate over links(auctions) in db
+promo_dict = {}
 try:
     updated_count = deleted_count = 0
     for link in db_links:
@@ -125,6 +126,16 @@ try:
         except Exception as e:
             with open ('logfile.log', 'a') as file:
                 file.write(f"""{formatDateTime} {file_name} Problem with loading most important data - {str(e)}\n""")
+                
+        price = None 
+        try:
+            # price from website
+            price = driver.find_element(By.CLASS_NAME, "offer-price__number").text.replace(" ", "")
+        except Exception as e:
+            with open ('logfile.log', 'a') as file:
+                file.write(f"""{formatDateTime} {file_name} Problem with loading price - {str(e)}\n""")
+                
+        
 
         # Get details data "Szczegóły"
         try:
@@ -151,6 +162,29 @@ try:
             cursor.execute(sql_query, values)
             conn.commit()
             updated_count += 1
+            
+            # Set promo price
+            try:
+                sql_query = f"select price, title, city from cars WHERE link = ?"
+                db_data = cursor.execute(sql_query, (link[0],))
+                # Db price
+                db_data = db_data.fetchone()
+                db_price, db_title, db_city = db_data
+                db_price = db_data[0]
+                if float(price) < float(db_price):
+                    promo_dict[link[0]] = {
+                        'old_price': db_price,
+                        'new_price': price,
+                        'difference': float(db_price) - float(price),
+                        'title': db_title,
+                        'city': db_city
+                    }
+                    cursor.execute("""UPDATE  cars set lowest_price = ? where link = ?""", (price, link[0]))
+                    cursor.commit()
+            except Exception as e:
+                with open ('logfile.log', 'a') as file:
+                    file.write(f"""{formatDateTime} {file_name} Problem with setting update price - {str(e)}\n""")
+            
         except:
             #auction is no longer avaliable
             result = cursor.execute("SELECT followed_since, ended_date, duration FROM cars WHERE link = ?",(link[0],)).fetchone()
@@ -175,7 +209,7 @@ try:
                                         skrzynia_biegow, typ_nadwozia, pojemnosc_skokowa,moc,rok_produkcji,model_pojazdu
                                         from cars where ended_date is NULL order by price""").fetchall()
 
-    deleted_data = cursor.execute("""SELECT link, title, city, followed_since, ended_date, duration, price, 
+    deleted_data = cursor.execute("""SELECT link, title, city, followed_since, ended_date, duration, price, lowest_price,
                                         przebieg, rodzaj_paliwa, skrzynia_biegow, typ_nadwozia, pojemnosc_skokowa,
                                         moc, rok_produkcji, model_pojazdu from cars where ended_date IS NOT NULL order by duration desc""").fetchall()
 
@@ -210,6 +244,7 @@ try:
             "ended_date": row["ended_date"],
             "duration": row["duration"],
             "price": row["price"],
+            "lowest_price": row["lowest_price"],
             "przebieg": row["przebieg"],
             "rodzaj_paliwa": row["rodzaj_paliwa"],
             "skrzynia_biegow": row["skrzynia_biegow"],
@@ -237,6 +272,11 @@ except Exception as e:
 body = f"""
 <h1>Observed auctions: {len(observed_dict)}, deleted auctions: {len(deleted_dict)}, updated data: {updated_count}, deleted data: {deleted_count}</h1>
 """
+# Promotions are shown at the top
+if promo_dict:
+    promo_body = promo_table(promo_dict)
+    body += promo_body
+
 if observed_body:
     body += "<h2>Observed auctions</h2>"
     body += observed_body 

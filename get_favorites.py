@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS cars (
     title TEXT,
     city TEXT,
     price REAL,
+    lowest_price REAL,
     followed_since DATE,
     ended_date DATE,
     duration INTEGER,
@@ -167,6 +168,37 @@ while True:
         
         favorites_objects = driver.find_element(By.XPATH, '/html/body/div[1]/div/div/div/main/main/ul')
         list_items = favorites_objects.find_elements(By.TAG_NAME, 'a')
+        
+        car_listings = driver.find_elements(By.CSS_SELECTOR, ".ooa-6crudm")
+        for car in car_listings:
+            price_element = car.find_element(By.CSS_SELECTOR, 'article .e6r213i1')  # Find the price element
+            price = price_element.text.strip()  # Get the price text
+            price = price.replace(',','.')     
+            clean_price = re.sub(r'[^\d.]', '', price)
+
+            # Extract car name (Peugeot 508)
+            title_element = car.find_element(By.CSS_SELECTOR, 'article a[href*="oferta"]')  # Find the car name
+            title = title_element.text.strip()  # Get the car name text
+
+            # Extract location (Osobowe · Kraków)
+            city_element = car.find_element(By.CSS_SELECTOR, 'article .e1m1sv334')  # Find the location element
+            city = city_element.text.strip()  # Get the location text
+            
+            link = title_element.get_attribute('href')  # Get the href attribute from the <a> tag
+
+            item_data = {
+                "title": title,
+                "city": city,
+                "price": clean_price,
+                "lowest_price": clean_price,
+                "followed_since": formatted_date
+            }
+            
+            print(item_data)
+            cars_dict[link] = item_data
+        
+        
+        
         counter += 1
     except NoSuchElementException:
             #print(f"No more pages after {counter}.")
@@ -176,30 +208,27 @@ while True:
         with open ('logfile.log', 'a') as file:
             file.write(f"""{formatDateTime} Problem with favorites page - {str(e)}\n""")
 
-#get current data from favorite's website
-    
-    for car in list_items:
-        try:
-            link = car.get_attribute('href')
-            title = car.get_attribute('title')
-            city = car.find_element(By.CSS_SELECTOR, 'p.e8o52ta6.ooa-1po1g1j').text
+# #get current data from favorite's website
+#     for car in list_items:
+#         try:
+#             link = car.get_attribute('href')
+#             print(f"link: {link}")
+#             title = car.find_element(By.CSS_SELECTOR, 'p a[href*="oferta"]')
+#             print(f"title: {title}")
+#             city = car.find_element(By.CLASS_NAME, 'e1m1sv334').text
+#             print(f"city: {city}")
             
-            price = car.find_element(By.CSS_SELECTOR, 'p[data-testid="ad-price"]').text
-            price = price.replace(',','.')     
-            clean_price = re.sub(r'[^\d.]', '', price)
+#             price = car.find_element(By.CSS_SELECTOR, 'p[data-testid="ad-price"]').text
+#             print(f"price: {price}")
+#             price = price.replace(',','.')     
+#             clean_price = re.sub(r'[^\d.]', '', price)
             
-            item_data = {
-                "title": title,
-                "city": city,
-                "price": clean_price,
-                "followed_since": formatted_date
-            }
-
-            cars_dict[link] = item_data
+     
             
-        except Exception as e:
-            with open ('logfile.log', 'a') as file:
-                file.write(f"""{formatDateTime} Problem with single auction details - {str(e)}\n""")
+#         except Exception as e:
+#             #print(f"problem {e}")
+#             with open ('logfile.log', 'a') as file:
+#                 file.write(f"""{formatDateTime} Problem with single auction details - {str(e)}\n""")
                 
 #close selenium's connection
 driver.close()  
@@ -221,7 +250,6 @@ except Exception as e:
     with open('logfile.log', 'a') as file:
         file.write(f"{formatDateTime}  {file_name} Problem with getting links from db: {e}\n")
 
-
 try:
     # Set correct type of links from db
     db_links = set(link[0] for link in db_links_get)
@@ -231,14 +259,17 @@ except Exception as e:
     with open('logfile.log', 'a') as file:
         file.write(f"{formatDateTime}  {file_name} Problem with comparing links from favorites and db: {e}\n")
 
+print(f"missing in db: {missing_in_db}")
 try:
     for link,data in missing_in_db.items():
         #add new links to old file + new to db
+        print(f"dodaje {link}")
         cursor.execute("""
-            INSERT INTO cars (link, title, city, price, followed_since)
-            VALUES (?, ?, ?, ?, ?)
-            """, (link, data['title'], data['city'], data['price'], data['followed_since']))
+            INSERT INTO cars (link, title, city, price, lowest_price, followed_since)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (link, data['title'], data['city'], data['price'], data['lowest_price'], data['followed_since']))
         conn.commit()
+        print("dodalem link")
 except Exception as e:
     with open('logfile.log', 'a') as file:
         file.write(f"{formatDateTime}  {file_name} Problem with inserting data to db: {e}\n")
