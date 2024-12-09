@@ -180,7 +180,7 @@ try:
                         'city': db_city
                     }
                     cursor.execute("""UPDATE  cars set lowest_price = ? where link = ?""", (price, link[0]))
-                    cursor.commit()
+                    conn.commit()
             except Exception as e:
                 with open ('logfile.log', 'a') as file:
                     file.write(f"""{formatDateTime} {file_name} Problem with setting update price - {str(e)}\n""")
