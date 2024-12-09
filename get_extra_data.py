@@ -274,7 +274,8 @@ body = f"""
 """
 # Promotions are shown at the top
 if promo_dict:
-    promo_body = promo_table(promo_dict)
+    sorted_promo_dict = {k: v for k, v in sorted(promo_dict.items(), key=lambda item: item[1]['difference'], reverse=True)}
+    promo_body = promo_table(sorted_promo_dict)
     body += promo_body
 
 if observed_body:

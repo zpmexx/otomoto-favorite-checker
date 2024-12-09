@@ -246,6 +246,8 @@ except Exception as e:
 # Get links from DB
 try:
     db_links_get = conn.execute("SELECT link from cars").fetchall()
+    # Links with no ended date - you may want to delete them from DB (unfollowed from otomoto)
+    db_active_links_get = conn.execute("SELECT link from cars where ended_date IS NULL").fetchall()
 except Exception as e:
     with open('logfile.log', 'a') as file:
         file.write(f"{formatDateTime}  {file_name} Problem with getting links from db: {e}\n")
@@ -253,13 +255,18 @@ except Exception as e:
 try:
     # Set correct type of links from db
     db_links = set(link[0] for link in db_links_get)
+    db_active_links = set(link[0] for link in db_active_links_get)
+    
+    missing_favorites = [link for link in db_active_links if link not in cars_dict.keys()]
+    with open ('missed_in_favorites.txt','w') as file:
+        for link in missing_favorites:
+            file.write(f'{link}\n')
     # Find links in cars_dict that are not in db_links
     missing_in_db = {link: cars_dict[link] for link in cars_dict if link not in db_links}
 except Exception as e:
     with open('logfile.log', 'a') as file:
         file.write(f"{formatDateTime}  {file_name} Problem with comparing links from favorites and db: {e}\n")
 
-print(f"missing in db: {missing_in_db}")
 try:
     for link,data in missing_in_db.items():
         #add new links to old file + new to db
